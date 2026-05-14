@@ -65,3 +65,7 @@ If Nico `pi-subagents` is not installed or active, `Task` reports:
 ```bash
 pi install npm:pi-subagents
 ```
+
+## Tool name conflicts
+
+If Pi reports `Tool "Skill" conflicts`, `Tool "TodoWrite" conflicts`, or `Tool "Task" conflicts`, another Superpowers compatibility package is already installed. Disable or remove the duplicate package. For local smoke tests, run with `--no-extensions -e .` so only this adapter loads.
