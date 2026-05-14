@@ -62,9 +62,12 @@ export function createFakePi(options: { tools?: FakeToolInfo[] } = {}) {
     events,
     registeredTools,
     async emit(event: string, payload: unknown, ctx: any) {
+      let last;
       for (const handler of handlers.get(event) ?? []) {
-        await handler(payload, ctx);
+        const result = await handler(payload, ctx);
+        if (result !== undefined) last = result;
       }
+      return last;
     },
   };
 }
