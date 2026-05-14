@@ -11,7 +11,7 @@ Install the upstream packages explicitly:
 ```bash
 pi install https://github.com/obra/superpowers
 pi install npm:pi-subagents
-pi install https://github.com/imrellx/pi-superpowers-adapter
+pi install git:github.com/imrellx/pi-superpowers-adapter
 ```
 
 For local development:
