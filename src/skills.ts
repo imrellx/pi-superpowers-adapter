@@ -14,6 +14,7 @@ export interface SkillMeta {
 
 export interface SkillDiscoveryOptions {
   extraRoots?: string[];
+  includeDefaultRoots?: boolean;
 }
 
 const MAX_DISCOVERED_SKILLS = 500;
@@ -57,16 +58,19 @@ export async function parseSkillFile(path: string): Promise<Required<SkillMeta>>
 }
 
 async function collectSkillRoots(cwd: string, options: SkillDiscoveryOptions): Promise<string[]> {
-  const roots = [
+  const roots = options.includeDefaultRoots === false ? [] : [
     join(homedir(), ".pi", "agent", "skills"),
     join(homedir(), ".agents", "skills"),
     join(cwd, ".pi", "skills"),
     join(cwd, ".agents", "skills"),
-    ...(options.extraRoots ?? []),
   ];
 
-  const gitPackagesDir = join(homedir(), ".pi", "agent", "git");
-  await findSkillsDirs(gitPackagesDir, roots, 0);
+  roots.push(...(options.extraRoots ?? []));
+
+  if (options.includeDefaultRoots !== false) {
+    const gitPackagesDir = join(homedir(), ".pi", "agent", "git");
+    await findSkillsDirs(gitPackagesDir, roots, 0);
+  }
 
   return Array.from(new Set(roots.map((root) => resolve(expandHome(root)))));
 }
@@ -120,14 +124,14 @@ export function clearSkillCache(): void {
 }
 
 export async function discoverSkills(cwd: string, options: SkillDiscoveryOptions = {}): Promise<Map<string, SkillMeta>> {
-  if (skillCache && !options.extraRoots?.length) return skillCache;
+  if (skillCache && !options.extraRoots?.length && options.includeDefaultRoots !== false) return skillCache;
 
   const skills = new Map<string, SkillMeta>();
   for (const root of await collectSkillRoots(cwd, options)) {
     await readRootSkills(root, skills);
   }
 
-  if (!options.extraRoots?.length) skillCache = skills;
+  if (!options.extraRoots?.length && options.includeDefaultRoots !== false) skillCache = skills;
   return skills;
 }
 
@@ -166,4 +170,34 @@ export function registerSkillTool(pi: ExtensionAPI, options: SkillDiscoveryOptio
       };
     },
   });
+}
+
+export interface BootstrapResult {
+  found: boolean;
+  prompt: string;
+  skillPath?: string;
+}
+
+export async function buildSuperpowersBootstrap(cwd: string, options: SkillDiscoveryOptions = {}): Promise<BootstrapResult> {
+  const skill = await loadSkill("using-superpowers", cwd, options);
+  if (!skill) {
+    return {
+      found: false,
+      prompt: "[pi-superpowers-adapter] using-superpowers skill not found. Install Superpowers with: pi install https://github.com/obra/superpowers",
+    };
+  }
+
+  const mapping = [
+    "Pi tool mapping for Superpowers:",
+    "- Skill -> adapter Skill",
+    "- TodoWrite -> adapter TodoWrite",
+    "- Task -> adapter Task backed by Nico pi-subagents",
+    "- File and shell tools use Pi names: read, bash, edit, write",
+  ].join("\n");
+
+  return {
+    found: true,
+    skillPath: skill.path,
+    prompt: `<superpowers-skills>\n${skill.content}\n\n${mapping}\n</superpowers-skills>`,
+  };
 }
