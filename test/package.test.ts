@@ -12,5 +12,6 @@ test("package stays a thin adapter with only peer Pi runtime dependencies", () =
   assert.equal(pkg.dependencies, undefined);
   assert.equal(pkg.peerDependencies["@earendil-works/pi-ai"], "*");
   assert.equal(pkg.peerDependencies["@earendil-works/pi-coding-agent"], "*");
+  assert.equal(pkg.peerDependencies["@earendil-works/pi-tui"], "*");
   assert.equal(pkg.peerDependencies.typebox, "*");
 });
