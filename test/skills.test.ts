@@ -64,3 +64,23 @@ test("Skill tool returns full stripped content", async () => {
   assert.match(result.content[0].text, /# Brainstorming\nFull content/);
   assert.equal(result.details.skillName, "brainstorming");
 });
+
+test("Skill renderer hides skill body in collapsed and expanded views", async () => {
+  clearSkillCache();
+  const root = await mkdtemp(join(tmpdir(), "skill-render-"));
+  await makeSkill(root, "using-superpowers", "# Using Superpowers\nSecret instructions");
+  const { pi, registeredTools } = createFakePi();
+  registerSkillTool(pi, { extraRoots: [root] });
+  const tool = registeredTools.get("Skill") as any;
+  assert.ok(tool);
+
+  const result = await tool.execute("skill-1", { skill: "using-superpowers" }, undefined, undefined, createFakeCtx(process.cwd()));
+  for (const expanded of [false, true]) {
+    const component = tool.renderResult(result, { expanded, isPartial: false }, undefined, { isError: false });
+    const rendered = component.render(120).join("\n");
+    assert.match(rendered, /Loaded skill: using-superpowers/);
+    assert.doesNotMatch(rendered, /Secret instructions/);
+    assert.doesNotMatch(rendered, /# Using Superpowers/);
+    assert.doesNotMatch(rendered, /Description:/);
+  }
+});

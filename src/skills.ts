@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { SkillSchema, type SkillInput } from "./schemas.ts";
 
 export interface SkillMeta {
@@ -168,6 +169,13 @@ export function registerSkillTool(pi: ExtensionAPI, options: SkillDiscoveryOptio
         content: [{ type: "text" as const, text: `Loaded skill: ${skill.name}\n${skill.description ? `\nDescription: ${skill.description}\n` : ""}\n---\n\n${skill.content}` }],
         details: { skillName: skill.name, skillPath: skill.path, skillDescription: skill.description, totalLines: skill.content.split("\n").length },
       };
+    },
+    renderResult(result, _options, _theme, context) {
+      const text = result.content.find((item) => item.type === "text")?.text ?? "";
+      if (context.isError) return new Text(text || "Skill failed.", 0, 0);
+
+      const details = result.details as { skillName?: string } | undefined;
+      return new Text(`Loaded skill: ${details?.skillName ?? "unknown"}`, 0, 0);
     },
   });
 }
