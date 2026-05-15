@@ -125,6 +125,35 @@ test("Skill tool missing error lists canonical skills when canonical cache is po
   );
 });
 
+test("Skill tool does not expose canonical skills disabled for model invocation", async () => {
+  clearSkillCache();
+  const root = await mkdtemp(join(tmpdir(), "canonical-disabled-"));
+  await makeSkill(root, "visible-skill");
+  await makeSkill(root, "hidden-skill");
+  setCanonicalSkills([
+    {
+      name: "visible-skill",
+      description: "visible desc",
+      filePath: join(root, "visible-skill", "SKILL.md"),
+      baseDir: join(root, "visible-skill"),
+      sourceInfo: { source: "test" },
+      disableModelInvocation: false,
+    } as any,
+    {
+      name: "hidden-skill",
+      description: "hidden desc",
+      filePath: join(root, "hidden-skill", "SKILL.md"),
+      baseDir: join(root, "hidden-skill"),
+      sourceInfo: { source: "test" },
+      disableModelInvocation: true,
+    } as any,
+  ]);
+
+  const skills = await discoverSkills(process.cwd(), { includeDefaultRoots: false });
+  assert.ok(skills.has("visible-skill"));
+  assert.equal(skills.has("hidden-skill"), false);
+});
+
 test("Skill renderer hides skill body in collapsed and expanded views", async () => {
   clearSkillCache();
   const root = await mkdtemp(join(tmpdir(), "skill-render-"));

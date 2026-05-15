@@ -123,7 +123,11 @@ async function readRootSkills(root: string, skills: Map<string, SkillMeta>): Pro
 
 export function setCanonicalSkills(skills: PiSkill[] | undefined): void {
   canonicalSkillCache = skills
-    ? new Map(skills.map((skill) => [skill.name, { name: skill.name, description: skill.description, path: skill.filePath }]))
+    ? new Map(
+        skills
+          .filter((skill) => !skill.disableModelInvocation)
+          .map((skill) => [skill.name, { name: skill.name, description: skill.description, path: skill.filePath }]),
+      )
     : null;
 }
 
