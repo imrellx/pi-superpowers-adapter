@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import registerExtension from "../src/index.ts";
-import { buildSuperpowersBootstrap, clearSkillCache } from "../src/skills.ts";
+import { buildSuperpowersBootstrap, clearSkillCache, discoverSkills } from "../src/skills.ts";
 import { createFakePi } from "./fakes.ts";
 
 async function createUsingSuperpowers(root: string) {
@@ -56,4 +56,49 @@ test("extension registers tools and injects bootstrap on before_agent_start", as
   } finally {
     delete process.env.PI_SUPERPOWERS_ADAPTER_EXTRA_SKILL_ROOTS;
   }
+});
+
+test("before_agent_start captures Pi canonical skills for Skill resolution", async () => {
+  clearSkillCache();
+  const root = await mkdtemp(join(tmpdir(), "entrypoint-canonical-"));
+  await createUsingSuperpowers(root);
+  const skillDir = join(root, "librarian");
+  await mkdir(skillDir, { recursive: true });
+  const skillPath = join(skillDir, "SKILL.md");
+  await writeFile(skillPath, `---\nname: librarian\ndescription: canonical librarian\n---\n\n# Librarian\n\nCanonical content.`);
+
+  const { pi, emit } = createFakePi({ tools: [{ name: "subagent", description: "Nico" }] });
+  registerExtension(pi);
+
+  await emit(
+    "before_agent_start",
+    {
+      systemPrompt: "base",
+      systemPromptOptions: {
+        cwd: process.cwd(),
+        skills: [
+          {
+            name: "using-superpowers",
+            description: "bootstrap",
+            filePath: join(root, "using-superpowers", "SKILL.md"),
+            baseDir: join(root, "using-superpowers"),
+            sourceInfo: { source: "git:github.com/obra/superpowers" },
+            disableModelInvocation: false,
+          },
+          {
+            name: "librarian",
+            description: "canonical librarian",
+            filePath: skillPath,
+            baseDir: skillDir,
+            sourceInfo: { source: "npm:pi-web-access" },
+            disableModelInvocation: false,
+          },
+        ],
+      },
+    },
+    { cwd: process.cwd(), hasUI: false, ui: { notify() {} } },
+  );
+
+  const skills = await discoverSkills(process.cwd(), { includeDefaultRoots: false });
+  assert.equal(skills.get("librarian")?.path, skillPath);
 });

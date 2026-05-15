@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { buildSuperpowersBootstrap, clearSkillCache, registerSkillTool, type SkillDiscoveryOptions } from "./skills.ts";
+import { buildSuperpowersBootstrap, clearSkillCache, registerSkillTool, setCanonicalSkills, type SkillDiscoveryOptions } from "./skills.ts";
 import { registerTaskTool } from "./task-bridge.ts";
 import { registerTodoWriteTool, resetTodos } from "./todos.ts";
 
@@ -28,6 +28,7 @@ export default function registerPiSuperpowersAdapter(pi: ExtensionAPI): void {
   });
 
   pi.on("before_agent_start", async (event, ctx: ExtensionContext) => {
+    setCanonicalSkills(event.systemPromptOptions?.skills);
     const bootstrap = await buildSuperpowersBootstrap(ctx.cwd, discoveryOptions());
     if (!bootstrap.found && ctx.hasUI) ctx.ui.notify(bootstrap.prompt, "warning");
     return { systemPrompt: `${event.systemPrompt}\n\n${bootstrap.prompt}` };

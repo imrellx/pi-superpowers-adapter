@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Skill as PiSkill } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { SkillSchema, type SkillInput } from "./schemas.ts";
 
@@ -21,6 +21,7 @@ export interface SkillDiscoveryOptions {
 const MAX_DISCOVERED_SKILLS = 500;
 
 let skillCache: Map<string, SkillMeta> | null = null;
+let canonicalSkillCache: Map<string, SkillMeta> | null = null;
 
 function expandHome(path: string): string {
   if (path === "~") return homedir();
@@ -120,11 +121,19 @@ async function readRootSkills(root: string, skills: Map<string, SkillMeta>): Pro
   }
 }
 
+export function setCanonicalSkills(skills: PiSkill[] | undefined): void {
+  canonicalSkillCache = skills
+    ? new Map(skills.map((skill) => [skill.name, { name: skill.name, description: skill.description, path: skill.filePath }]))
+    : null;
+}
+
 export function clearSkillCache(): void {
   skillCache = null;
+  canonicalSkillCache = null;
 }
 
 export async function discoverSkills(cwd: string, options: SkillDiscoveryOptions = {}): Promise<Map<string, SkillMeta>> {
+  if (canonicalSkillCache) return canonicalSkillCache;
   if (skillCache && !options.extraRoots?.length && options.includeDefaultRoots !== false) return skillCache;
 
   const skills = new Map<string, SkillMeta>();

@@ -10,6 +10,7 @@ import {
   findSkill,
   parseSkillFile,
   registerSkillTool,
+  setCanonicalSkills,
   stripFrontmatter,
 } from "../src/skills.ts";
 
@@ -63,6 +64,65 @@ test("Skill tool returns full stripped content", async () => {
   assert.match(result.content[0].text, /Loaded skill: brainstorming/);
   assert.match(result.content[0].text, /# Brainstorming\nFull content/);
   assert.equal(result.details.skillName, "brainstorming");
+});
+
+test("Skill tool resolves canonical Pi skills before filesystem discovery", async () => {
+  clearSkillCache();
+  const canonicalRoot = await mkdtemp(join(tmpdir(), "canonical-skill-"));
+  await makeSkill(canonicalRoot, "librarian", "# Librarian\nCanonical content");
+  const fallbackRoot = await mkdtemp(join(tmpdir(), "fallback-skill-"));
+  await makeSkill(fallbackRoot, "librarian", "# Librarian\nFallback content");
+  setCanonicalSkills([
+    {
+      name: "librarian",
+      description: "canonical desc",
+      filePath: join(canonicalRoot, "librarian", "SKILL.md"),
+      baseDir: join(canonicalRoot, "librarian"),
+      sourceInfo: { source: "npm:pi-web-access" },
+      disableModelInvocation: false,
+    } as any,
+  ]);
+
+  const { pi, registeredTools } = createFakePi();
+  registerSkillTool(pi, { extraRoots: [fallbackRoot] });
+  const tool = registeredTools.get("Skill");
+  assert.ok(tool);
+
+  const result = await tool.execute("skill-1", { skill: "librarian" }, undefined, undefined, createFakeCtx(process.cwd()));
+  assert.match(result.content[0].text, /Canonical content/);
+  assert.doesNotMatch(result.content[0].text, /Fallback content/);
+  assert.equal(result.details.skillPath, join(canonicalRoot, "librarian", "SKILL.md"));
+});
+
+test("Skill tool missing error lists canonical skills when canonical cache is populated", async () => {
+  clearSkillCache();
+  const root = await mkdtemp(join(tmpdir(), "canonical-missing-"));
+  await makeSkill(root, "librarian");
+  setCanonicalSkills([
+    {
+      name: "librarian",
+      description: "canonical desc",
+      filePath: join(root, "librarian", "SKILL.md"),
+      baseDir: join(root, "librarian"),
+      sourceInfo: { source: "npm:pi-web-access" },
+      disableModelInvocation: false,
+    } as any,
+  ]);
+
+  const { pi, registeredTools } = createFakePi();
+  registerSkillTool(pi);
+  const tool = registeredTools.get("Skill");
+  assert.ok(tool);
+
+  await assert.rejects(
+    () => tool.execute("skill-1", { skill: "missing" }, undefined, undefined, createFakeCtx(process.cwd())),
+    (error: any) => {
+      assert.match(error.message, /Skill "missing" not found/);
+      assert.match(error.message, /  - librarian/);
+      assert.doesNotMatch(error.message, /brainstorming/);
+      return true;
+    },
+  );
 });
 
 test("Skill renderer hides skill body in collapsed and expanded views", async () => {
